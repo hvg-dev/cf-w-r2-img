@@ -2,6 +2,7 @@
   "name": "cf-worker",
   "userEnvProbe": "loginInteractiveShell",
   "image": "mcr.microsoft.com/vscode/devcontainers/base:0-ubuntu-22.04",
+  "forwardPorts": [6780,6743,8976],
   "features": {
     "ghcr.io/devcontainers/features/node:1":{
       "version": "lts",
