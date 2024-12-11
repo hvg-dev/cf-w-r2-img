@@ -13,6 +13,12 @@
 
 export default {
     async fetch(request, env, ctx): Promise<Response> {
-        return new Response('Hello World!');
+        //let url = new URL(request.url)
+        let url = new URL('https://r2.test-hvg.hu/cdn-cgi/image/width=250/f0/f0/f0c89ccc-11f6-44ac-8111-49efe070d7f0.jpg')
+        let modified = new Request(url.toString(), request)
+        let response = await fetch(modified, {
+            cf: { cacheTtl: env.CF_CACHE_TTL }
+        })
+        return response
     },
 } satisfies ExportedHandler<Env>;

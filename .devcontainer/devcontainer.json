@@ -8,6 +8,7 @@
       "version": "lts",
       "installYarnUsingApt": true
     },
+    "ghcr.io/michidk/devcontainers-features/bun:1": {},
     "ghcr.io/joedmck/devcontainer-features/cloudflared:1": {},
     "ghcr.io/devcontainers/features/terraform:1":{},
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
