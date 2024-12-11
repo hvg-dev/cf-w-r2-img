@@ -2,4 +2,5 @@
 // After adding bindings to `wrangler.toml`, regenerate this interface via `npm run cf-typegen`
 interface Env {
     CF_CACHE_TTL: number
+    S3_CDN_URL: string
 }

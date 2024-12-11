@@ -5,7 +5,8 @@
   "SpacesAftertabs": false,
   "NoColor": false,
   "Exclude": [
-    ".git/"
+    ".git/",
+    "bun.lockb"
   ],
   "AllowedContentTypes": [],
   "PassedFiles": [],
