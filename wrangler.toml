@@ -5,7 +5,7 @@ compatibility_date = "2024-11-06"
 compatibility_flags = ["nodejs_compat"]
 
 routes = [
-    { pattern = "img.test-hvg.hu", custom_domain = true }
+    { pattern = "cf-img.test-hvg.hu", custom_domain = true }
 ]
 
 # Workers Logs
