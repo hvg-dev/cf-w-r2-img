@@ -6,6 +6,12 @@ export default {
         //console.log(url.pathname)
         let match = regex.exec(url.pathname)
 
+        if (match?.groups == null) {
+            return new Response('', {
+                status: 400
+            })
+        }
+
         let view = match.groups.view
         //console.log(view)
 
@@ -42,5 +48,6 @@ export default {
             cf: { cacheTtl: env.CF_CACHE_TTL }
         })
         return response
+
     },
 } satisfies ExportedHandler<Env>;
