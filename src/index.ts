@@ -1,53 +1,54 @@
+import { Hono } from 'hono'
+import { swaggerUI } from '@hono/swagger-ui'
 
-export default {
-    async fetch(request, env): Promise<Response> {
-        let url = new URL(request.url)
-        const regex = /^\/Img\/(?<view>.*)\/(?<img>.*).(?<ext>jpg|png)$/g;
-        //console.log(url.pathname)
-        let match = regex.exec(url.pathname)
+type Bindings = {
+    IMG_BUCKET: R2Bucket
+    CF_CACHE_TTL: number
+    S3_CDN_URL: string
+    S3_CDN_DIR: string
+    CF_VERSION_METADATA: WorkerVersionMetadata;
+}
 
-        if (match?.groups == null) {
-            return new Response('', {
-                status: 400
-            })
-        }
+const app = new Hono<{ Bindings: Bindings }>()
 
-        let view = match.groups.view
-        //console.log(view)
+app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
-        let img = match.groups.img
-        //console.log(img)
+    const viewId = c.req.param('viewId') || '';
+    const imimageFile = c.req.param('imageFile') || '';
+    const density = c.req.query('density') || 1;
 
-        let ext = match.groups.ext
-        //console.log(ext)
+    let fileItems = imimageFile.split('.');
 
-        let l = img.substring(0,2)
-        //console.log(l)
+    const imageId = fileItems[0];
+    const ext = fileItems[1];
 
-        let h = img.substring(img.length - 2)
-        //console.log(h)
+    let l = imageId.substring(0,2)
 
-        const views: { [key: string]: string } = {
-            "00000000-0000-0000-0000-000000000000": "quality=100",
-            "2e6bbfa1-3baa-4a23-9b95-1671cd328d09": "width=579,height=360,gravity=0.5x0.5,fit=cover,quality=90",
-            "d687bb3a-509a-49ca-b43e-cbc038e76e5b": "width=580,quality=100",
-            "ffdb5e3a-e632-4abc-b367-3d9b3bb5573b": "width=90,height=60,gravity=0.5x0.5,fit=cover,quality=100"
-        };
+    let h = imageId.substring(imageId.length - 2)
 
-        if (!views.hasOwnProperty(view)) {
-            return new Response('', {
-                status: 404
-            })
-        }
+    let image:any = {}
+    image.width = 1000;
+    image.height = 50;
 
-        const s3 = env.S3_CDN_URL
+    const optionsKeys = Object.entries(image).map(([key, val]) => `${key}=${val}`).join(',')
 
-        url = new URL(`https://${s3}/cdn-cgi/image/${views[view]}/${l}/${h}/${img}.${ext}`)
-        let modified = new Request(url.toString(), request)
-        let response = await fetch(modified, {
-            cf: { cacheTtl: env.CF_CACHE_TTL }
-        })
-        return response
+    let s3Url = c.env.S3_CDN_URL
+    let s3Dir = c.env.S3_CDN_DIR
 
-    },
-} satisfies ExportedHandler<Env>;
+    let imgUrl = new URL(`https://${s3Url}${s3Dir}${l}/${h}/${imageId}.${ext}`)
+
+    let resized = await fetch(imgUrl, {
+        cf: { image: image }
+    })
+
+    let response = new Response(resized.body, resized);
+        response.headers.set('version', c.env.CF_VERSION_METADATA.id );
+        response.headers.set('density', density.toString());
+        response.headers.set('resizeOptions', optionsKeys);
+
+    return response;
+})
+
+app.get("/swagger", swaggerUI({ url: "/doc/swagger.json" }));
+
+export default app

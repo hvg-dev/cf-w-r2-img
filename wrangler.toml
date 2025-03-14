@@ -5,8 +5,16 @@ compatibility_date = "2024-11-06"
 compatibility_flags = ["nodejs_compat"]
 
 routes = [
-    { pattern = "cf-img.test-hvg.hu", custom_domain = true }
+    { pattern = "img-worker.test-hvg.hu", custom_domain = true },
+    { pattern = "img-worker.staging-hvg.hu", custom_domain = true }
 ]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
 
 # Workers Logs
 # Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
@@ -29,6 +37,7 @@ enabled = true
 [vars]
 CF_CACHE_TTL=1000
 S3_CDN_URL="r2.test-hvg.hu"
+S3_CDN_DIR="/uploads/"
 # Bind the Workers AI model catalog. Run machine learning models, powered by serverless GPUs, on Cloudflare’s global network
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#workers-ai
 # [ai]
@@ -101,9 +110,10 @@ S3_CDN_URL="r2.test-hvg.hu"
 
 # Bind an R2 Bucket. Use R2 to store arbitrarily large blobs of data, such as files.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#r2-buckets
-# [[r2_buckets]]
-# binding = "MY_BUCKET"
-# bucket_name = "my-bucket"
+[[r2_buckets]]
+binding = "IMG_BUCKET"
+bucket_name = "img-dev"
+preview_bucket_name = "img-dev"
 
 # Bind another Worker service. Use this binding to call another Worker without network overhead.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
