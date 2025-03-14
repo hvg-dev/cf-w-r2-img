@@ -2,11 +2,12 @@
   "Verbose": false,
   "Debug": false,
   "IgnoreDefaults": false,
-  "SpacesAftertabs": false,
+  "SpacesAfterTabs": false,
   "NoColor": false,
   "Exclude": [
     ".git/",
-    "bun.lockb"
+    "package-lock.json",
+    "worker-configuration.d.ts"
   ],
   "AllowedContentTypes": [],
   "PassedFiles": [],

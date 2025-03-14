@@ -1,53 +1,111 @@
+import { Hono } from 'hono'
+import { swaggerUI } from '@hono/swagger-ui'
+import { Guid } from 'guid-ts';
+import { Base64 } from 'js-base64'
+import VIEWS from './models/views';
 
-export default {
-    async fetch(request, env): Promise<Response> {
-        let url = new URL(request.url)
-        const regex = /^\/Img\/(?<view>.*)\/(?<img>.*).(?<ext>jpg|png)$/g;
-        //console.log(url.pathname)
-        let match = regex.exec(url.pathname)
+type Bindings = {
+    IMG_BUCKET: R2Bucket
+    IMG_KV: KVNamespace
+    CF_VERSION_METADATA: WorkerVersionMetadata
+    CF_CACHE_TTL: number
+    S3_CDN_URL: string
+    S3_CDN_DIR: string
+}
+
+const DEFAULT_VIEW_ID = Guid.empty();
+
+const regex = /^(?<width>[0-9]*)-(?<height>[0-9]*)$/g
+
+const app = new Hono<{ Bindings: Bindings }>()
+
+app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
+
+    const cache = caches.default
+
+    const CF_CACHE_TTL = c.env.CF_CACHE_TTL
+
+    const viewId = new Guid(c.req.param('viewId'))
+    let _view:any = VIEWS.find( (view) => view.id == viewId.toString())?.options || null
+
+    if( _view === null ) {
+        console.log(`View is not found (${c.req.param('viewId')})`)
+
+        _view = VIEWS.find( (view) => view.id == DEFAULT_VIEW_ID.toString())?.options || {}
+
+        let match = regex.exec(c.req.param('viewId'))
 
         if (match?.groups == null) {
-            return new Response('', {
-                status: 400
-            })
+            return new Response(`View is not found  ${c.req.param('viewId')}`, { status: 404 })
         }
 
-        let view = match.groups.view
-        //console.log(view)
-
-        let img = match.groups.img
-        //console.log(img)
-
-        let ext = match.groups.ext
-        //console.log(ext)
-
-        let l = img.substring(0,2)
-        //console.log(l)
-
-        let h = img.substring(img.length - 2)
-        //console.log(h)
-
-        const views: { [key: string]: string } = {
-            "00000000-0000-0000-0000-000000000000": "quality=100",
-            "2e6bbfa1-3baa-4a23-9b95-1671cd328d09": "width=579,height=360,gravity=0.5x0.5,fit=cover,quality=90",
-            "d687bb3a-509a-49ca-b43e-cbc038e76e5b": "width=580,quality=100",
-            "ffdb5e3a-e632-4abc-b367-3d9b3bb5573b": "width=90,height=60,gravity=0.5x0.5,fit=cover,quality=100"
-        };
-
-        if (!views.hasOwnProperty(view)) {
-            return new Response('', {
-                status: 404
-            })
+        if(match.groups.width != '0') {
+            _view.width = match.groups.width
         }
 
-        const s3 = env.S3_CDN_URL
+        if(match.groups.height != '0') {
+            _view.height = match.groups.height
+        }
 
-        url = new URL(`https://${s3}/cdn-cgi/image/${views[view]}/${l}/${h}/${img}.${ext}`)
-        let modified = new Request(url.toString(), request)
-        let response = await fetch(modified, {
-            cf: { cacheTtl: env.CF_CACHE_TTL }
-        })
+        _view.fit = 'cover'
+    }
+
+    const imimageFile = c.req.param('imageFile').toLowerCase() || '';
+    const density = c.req.query('density') || 1;
+
+    _view.dpr = density
+
+    const _options = Object.entries(_view).map(([key, val]) => `${key}=${val}`).join(',')
+
+    const cacheKeyItems:string[] = [Base64.encode(_options), imimageFile]
+
+    const cacheKey = cacheKeyItems.join('-')
+
+    const s3CacheKey = cacheKeyItems.join('/')
+
+    // Check whether the value is already available in the cache
+    // if not, fetch it from R2, and store it in the cache
+    let response = await cache.match(c.req.url)
+    if (response) {
+        console.log(`Cache HIT for: ${cacheKey}.`)
+        console.log(`Current options: ${_options}`)
         return response
+    }
 
-    },
-} satisfies ExportedHandler<Env>;
+    console.log(`Cache MISS for: ${cacheKey}.`)
+
+    console.log(`Current options: ${_options}`)
+
+    const fileItems = imimageFile.split('.');
+
+
+    const imageId = new Guid(fileItems[0])
+
+    const ext = fileItems[1];
+
+    const l = imageId.toString().substring(0,2)
+
+    const h = imageId.toString().substring(imageId.toString().length - 2)
+
+    const s3Url = c.env.S3_CDN_URL
+    const s3Dir = c.env.S3_CDN_DIR
+
+    const imgUrl = new URL(`https://${s3Url}${s3Dir}${l}/${h}/${imimageFile}`)
+
+    const resized = await fetch(imgUrl, {
+        cf: { image: _view }
+    })
+
+    response = new Response(resized.body, resized);
+    response.headers.set('Version', c.env.CF_VERSION_METADATA.id );
+    response.headers.set('Resize-Options', _options);
+    response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`)
+
+    await cache.put(c.req.url, response.clone())
+
+    return response;
+})
+
+app.get("/swagger", swaggerUI({ url: "/doc/swagger.json" }));
+
+export default app
