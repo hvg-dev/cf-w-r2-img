@@ -21,22 +21,24 @@ const app = new Hono<{ Bindings: Bindings }>()
 
 app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
+    const _viewId = c.req.param('viewId').toLowerCase()
+
     const cache = caches.default
 
     const CF_CACHE_TTL = c.env.CF_CACHE_TTL
 
-    const viewId = new Guid(c.req.param('viewId'))
+    const viewId = new Guid(_viewId)
     let _view:any = VIEWS.find( (view) => view.id == viewId.toString())?.options || null
 
     if( _view === null ) {
-        console.log(`View is not found (${c.req.param('viewId')})`)
+        console.log(`View is not found (${_viewId})`)
 
         _view = VIEWS.find( (view) => view.id == DEFAULT_VIEW_ID.toString())?.options || {}
 
-        let match = regex.exec(c.req.param('viewId'))
+        let match = regex.exec(_viewId)
 
         if (match?.groups == null) {
-            return new Response(`View is not found  ${c.req.param('viewId')}`, { status: 404 })
+            return new Response(`View is not found  ${_viewId}`, { status: 404 })
         }
 
         if(match.groups.width != '0') {
