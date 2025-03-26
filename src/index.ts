@@ -13,7 +13,7 @@ type Bindings = {
     S3_CDN_DIR: string
 }
 
-const DEFAULT_VIEW_ID = Guid.empty();
+// const DEFAULT_VIEW_ID = Guid.empty();
 
 const regex = /^(?<width>[0-9]*)-(?<height>[0-9]*)$/g
 
@@ -33,20 +33,27 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
     if( _view === null ) {
         console.log(`View is not found (${_viewId})`)
 
-        _view = VIEWS.find( (view) => view.id == DEFAULT_VIEW_ID.toString())?.options || {}
+        //_view = VIEWS.find( (view) => view.id == DEFAULT_VIEW_ID.toString())?.options || {}
 
-        let match = regex.exec(_viewId)
+        _view = {}
 
-        if (match?.groups == null) {
+
+        if (!regex.test(_viewId)) {
             return new Response(`View is not found  ${_viewId}`, { status: 404 })
         }
 
-        if(match.groups.width != '0') {
-            _view.width = match.groups.width
-        }
+        let match = regex.exec(_viewId)
 
-        if(match.groups.height != '0') {
-            _view.height = match.groups.height
+        if (match && match.groups) {
+            const width:number = +match.groups.width
+            if (width != 0) {
+                _view.width = width
+            }
+
+            const height:number = +match.groups.height
+            if (height != 0) {
+                _view.height = height
+            }
         }
 
         _view.fit = 'cover'
