@@ -57,7 +57,13 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     _view.dpr = density
 
-    const _options = Object.entries(_view).map(([key, val]) => `${key}=${val}`).join(',')
+    let _options = Object.entries(_view).map(([key, val]) => `${key}=${val}`).join(',')
+
+    // Fix for the gravity nested object
+    if(_options.indexOf('gravity=[object Object]') > -1) {
+        const gravity = Object.entries(_view.gravity).map(([val]) => `${val}`).join('x')
+        _options = _options.replace('gravity=[object Object]', `gravity=${gravity}`)
+    }
 
     const cacheKeyItems:string[] = [Base64.encode(_options), imimageFile]
 
