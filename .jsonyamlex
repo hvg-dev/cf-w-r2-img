@@ -2,3 +2,4 @@
 .devcontainer/devcontainer.json
 # exclude tsconfig.json
 tsconfig.json
+.vscode/launch.json
