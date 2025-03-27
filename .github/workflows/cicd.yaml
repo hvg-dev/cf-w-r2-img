@@ -6,7 +6,7 @@ on:
   workflow_dispatch: #kezi inditas
 
 env:
-  WRANGLER_VERSION: "4.4.1"
+  WRANGLER_VERSION: "4.5.0"
   CLOUDFLARE_WORKER_ENV: "test_staging"
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 jobs:
