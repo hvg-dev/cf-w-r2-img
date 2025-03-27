@@ -13,8 +13,6 @@ type Bindings = {
     S3_CDN_DIR: string
 }
 
-// const DEFAULT_VIEW_ID = Guid.empty();
-
 const regex = /^(?<width>[0-9]*)-(?<height>[0-9]*)$/g
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -23,40 +21,34 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     const _viewId = c.req.param('viewId').toLowerCase()
 
-    const cache = caches.default
+    //const cache = caches.default
 
     const CF_CACHE_TTL = c.env.CF_CACHE_TTL
 
     const viewId = new Guid(_viewId)
-    let _view:any = VIEWS.find( (view) => view.id == viewId.toString())?.options || null
+    let _view:any = {}
 
-    if( _view === null ) {
+    if ( Guid.isValid(viewId.toString()) && VIEWS.find((view) => view.id == viewId.toString())) {
+        _view = VIEWS.find( (view) => view.id == viewId.toString())?.options || {}
+    } else {
         console.log(`View is not found (${_viewId})`)
-
-        //_view = VIEWS.find( (view) => view.id == DEFAULT_VIEW_ID.toString())?.options || {}
-
-        _view = {}
-
-
-        if (!regex.test(_viewId)) {
-            return new Response(`View is not found  ${_viewId}`, { status: 404 })
-        }
 
         let match = regex.exec(_viewId)
 
-        if (match && match.groups) {
-            const width:number = +match.groups.width
-            if (width != 0) {
-                _view.width = width
-            }
+        if(!match || !match.groups) {
+            return new Response(`ViewId is not valid ${_viewId}`, { status: 400 })
+        }
 
-            const height:number = +match.groups.height
-            if (height != 0) {
-                _view.height = height
-            }
+        if(match.groups.width != '0') {
+            _view.width = +match.groups.width
+        }
+
+        if(match.groups.height != '0') {
+            _view.height = +match.groups.height
         }
 
         _view.fit = 'cover'
+
     }
 
     const imageFile = c.req.param('imageFile').toLowerCase() || '';
@@ -68,7 +60,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     // Fix for the gravity nested object
     if(_options.indexOf('gravity=[object Object]') > -1) {
-        const gravity = Object.entries(_view.gravity).map(([val]) => `${val}`).join('x')
+        const gravity = Object.entries(_view.gravity).map(([key, val]) => `${val}`).join('x')
         _options = _options.replace('gravity=[object Object]', `gravity=${gravity}`)
     }
 
@@ -78,14 +70,15 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     const s3CacheKey = cacheKeyItems.join('/')
 
+    let response = {} as Response
     // Check whether the value is already available in the cache
     // if not, fetch it from R2, and store it in the cache
-    let response = await cache.match(c.req.url)
-    if (response) {
-        console.log(`Cache HIT for: ${cacheKey}.`)
-        console.log(`Current options: ${_options}`)
-        return response
-    }
+    // let response = await cache.match(c.req.url)
+    // if (response) {
+    //     console.log(`Cache HIT for: ${cacheKey}.`)
+    //     console.log(`Current options: ${_options}`)
+    //     return response
+    // }
 
     console.log(`Cache MISS for: ${cacheKey}.`)
 
@@ -115,7 +108,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
     response.headers.set('Resize-Options', _options);
     response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`)
 
-    await cache.put(c.req.url, response.clone())
+    // await cache.put(c.req.url, response.clone())
 
     return response;
 })
