@@ -36,6 +36,8 @@ jobs:
     name: Deploy
     if: ${{ github.ref == 'refs/heads/main' }}
     needs: [check]
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
