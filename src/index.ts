@@ -59,7 +59,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
         _view.fit = 'cover'
     }
 
-    const imimageFile = c.req.param('imageFile').toLowerCase() || '';
+    const imageFile = c.req.param('imageFile').toLowerCase() || '';
     const density = c.req.query('density') || 1;
 
     _view.dpr = density
@@ -72,7 +72,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
         _options = _options.replace('gravity=[object Object]', `gravity=${gravity}`)
     }
 
-    const cacheKeyItems:string[] = [Base64.encode(_options), imimageFile]
+    const cacheKeyItems:string[] = [Base64.encode(_options), imageFile]
 
     const cacheKey = cacheKeyItems.join('-')
 
@@ -91,8 +91,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     console.log(`Current options: ${_options}`)
 
-    const fileItems = imimageFile.split('.');
-
+    const fileItems = imageFile.split('.');
 
     const imageId = new Guid(fileItems[0])
 
@@ -105,7 +104,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
     const s3Url = c.env.S3_CDN_URL
     const s3Dir = c.env.S3_CDN_DIR
 
-    const imgUrl = new URL(`https://${s3Url}${s3Dir}${l}/${h}/${imimageFile}`)
+    const imgUrl = new URL(`https://${s3Url}${s3Dir}${l}/${h}/${imageFile}`)
 
     const resized = await fetch(imgUrl, {
         cf: { image: _view }
