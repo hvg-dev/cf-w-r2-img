@@ -6,4 +6,3 @@ import worker from '../src/index';
 // For now, you'll need to do something like this to get a correctly-typed
 // `Request` to pass to `worker.fetch()`.
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
-
