@@ -10,6 +10,7 @@ type Bindings = {
     CF_CACHE_TTL: number;
     S3_CDN_URL: string;
     S3_CDN_DIR: string;
+    S3_CACHE_DIR: string;
 };
 
 const isGuidInARetardedWay = (guid: string) => guid.replaceAll('-', '').length === 32 && guid.split('-').length !== 2;
@@ -73,7 +74,8 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     const cacheKey = cacheKeyItems.join('.');
 
-    const s3CacheKey = cacheKeyItems.join('/');
+    const s3CacheDir = c.env.S3_CACHE_DIR;
+    const s3CacheKey = `${s3CacheDir}${cacheKeyItems[0].substring(cacheKeyItems[0].length - 2)}/${cacheKeyItems.join('/')}`;
 
     // Check whether the value is already available in the cache
     // if not, fetch it from R2, and store it in the cache
@@ -111,7 +113,8 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
     response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`);
 
     await cache.put(c.req.url, response.clone())
-
+    await c.env.IMG_KV.put(cacheKey, JSON.stringify(response.clone().headers))
+    await c.env.IMG_BUCKET.put(s3CacheKey, response.clone().body)
     return response;
 });
 
