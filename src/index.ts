@@ -69,9 +69,9 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
         options = options.replace('gravity=[object Object]', `gravity=${gravity}`);
     }
 
-    const cacheKeyItems: string[] = [Base64.encode(options), imageFile];
+    const cacheKeyItems: string[] = [Base64.encode(options, true), imageFile];
 
-    const cacheKey = cacheKeyItems.join('-');
+    const cacheKey = cacheKeyItems.join('.');
 
     const s3CacheKey = cacheKeyItems.join('/');
 
