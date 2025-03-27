@@ -1,118 +1,118 @@
-import { Hono } from 'hono'
-import { swaggerUI } from '@hono/swagger-ui'
+import { Hono } from 'hono';
+import { swaggerUI } from '@hono/swagger-ui';
 import { Guid } from 'guid-ts';
-import { Base64 } from 'js-base64'
-import VIEWS from './models/views';
+import { Base64 } from 'js-base64';
+import allPresetViews from './models/views';
 
 type Bindings = {
-    IMG_BUCKET: R2Bucket
-    IMG_KV: KVNamespace
-    CF_VERSION_METADATA: WorkerVersionMetadata
-    CF_CACHE_TTL: number
-    S3_CDN_URL: string
-    S3_CDN_DIR: string
-}
+	IMG_BUCKET: R2Bucket;
+	IMG_KV: KVNamespace;
+	CF_VERSION_METADATA: WorkerVersionMetadata;
+	CF_CACHE_TTL: number;
+	S3_CDN_URL: string;
+	S3_CDN_DIR: string;
+};
 
-const regex = /^(?<width>[0-9]*)-(?<height>[0-9]*)$/g
-
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings }>();
 
 app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
+	//const cache = caches.default
+	const CF_CACHE_TTL = c.env.CF_CACHE_TTL;
 
-    const _viewId = c.req.param('viewId').toLowerCase()
+	const rawViewId = c.req.param('viewId').toLowerCase();
+	const parsedViewId = new Guid(rawViewId);
 
-    //const cache = caches.default
+	let targetView: any = {};
 
-    const CF_CACHE_TTL = c.env.CF_CACHE_TTL
+	if (Guid.isValid(parsedViewId.toString()) && allPresetViews.find((view) => view.id == parsedViewId.toString())) {
+		targetView = allPresetViews.find((view) => view.id == parsedViewId.toString())?.options || {};
+	} else {
+		console.log(`View is not valid Guid, going for exact size: (${rawViewId})`);
 
-    const viewId = new Guid(_viewId)
-    let _view:any = {}
+        const exactDimensionRegex = /^(?<width>[0-9]*)-(?<height>[0-9]*)$/g;
+		let match = exactDimensionRegex.exec(rawViewId);
 
-    if ( Guid.isValid(viewId.toString()) && VIEWS.find((view) => view.id == viewId.toString())) {
-        _view = VIEWS.find( (view) => view.id == viewId.toString())?.options || {}
-    } else {
-        console.log(`View is not found (${_viewId})`)
+		if (!match || !match.groups) {
+			return new Response(`ViewId / exact size is not valid ${rawViewId}`, { status: 400 });
+		}
 
-        let match = regex.exec(_viewId)
+		if (match.groups.width != '0') {
+			targetView.width = +match.groups.width;
+		}
 
-        if(!match || !match.groups) {
-            return new Response(`ViewId is not valid ${_viewId}`, { status: 400 })
-        }
+		if (match.groups.height != '0') {
+			targetView.height = +match.groups.height;
+		}
 
-        if(match.groups.width != '0') {
-            _view.width = +match.groups.width
-        }
+		targetView.fit = 'cover';
+	}
 
-        if(match.groups.height != '0') {
-            _view.height = +match.groups.height
-        }
+	const imageFile = c.req.param('imageFile').toLowerCase() || '';
+	const density = c.req.query('density') || 1;
 
-        _view.fit = 'cover'
+	targetView.dpr = density;
 
-    }
+	let _options = Object.entries(targetView)
+		.map(([key, val]) => `${key}=${val}`)
+		.join(',');
 
-    const imageFile = c.req.param('imageFile').toLowerCase() || '';
-    const density = c.req.query('density') || 1;
+	// Fix for the gravity nested object
+	if (_options.indexOf('gravity=[object Object]') > -1) {
+		const gravity = Object.entries(targetView.gravity)
+			.map(([key, val]) => `${val}`)
+			.join('x');
+		_options = _options.replace('gravity=[object Object]', `gravity=${gravity}`);
+	}
 
-    _view.dpr = density
+	const cacheKeyItems: string[] = [Base64.encode(_options), imageFile];
 
-    let _options = Object.entries(_view).map(([key, val]) => `${key}=${val}`).join(',')
+	const cacheKey = cacheKeyItems.join('-');
 
-    // Fix for the gravity nested object
-    if(_options.indexOf('gravity=[object Object]') > -1) {
-        const gravity = Object.entries(_view.gravity).map(([key, val]) => `${val}`).join('x')
-        _options = _options.replace('gravity=[object Object]', `gravity=${gravity}`)
-    }
+	const s3CacheKey = cacheKeyItems.join('/');
 
-    const cacheKeyItems:string[] = [Base64.encode(_options), imageFile]
+	let response = {} as Response;
+	// Check whether the value is already available in the cache
+	// if not, fetch it from R2, and store it in the cache
+	// let response = await cache.match(c.req.url)
+	// if (response) {
+	//     console.log(`Cache HIT for: ${cacheKey}.`)
+	//     console.log(`Current options: ${_options}`)
+	//     return response
+	// }
 
-    const cacheKey = cacheKeyItems.join('-')
+	console.log(`Cache MISS for: ${cacheKey}.`);
 
-    const s3CacheKey = cacheKeyItems.join('/')
+	console.log(`Current options: ${_options}`);
 
-    let response = {} as Response
-    // Check whether the value is already available in the cache
-    // if not, fetch it from R2, and store it in the cache
-    // let response = await cache.match(c.req.url)
-    // if (response) {
-    //     console.log(`Cache HIT for: ${cacheKey}.`)
-    //     console.log(`Current options: ${_options}`)
-    //     return response
-    // }
+	const fileItems = imageFile.split('.');
 
-    console.log(`Cache MISS for: ${cacheKey}.`)
+	const imageId = new Guid(fileItems[0]);
 
-    console.log(`Current options: ${_options}`)
+	const ext = fileItems[1];
 
-    const fileItems = imageFile.split('.');
+	const l = imageId.toString().substring(0, 2);
 
-    const imageId = new Guid(fileItems[0])
+	const h = imageId.toString().substring(imageId.toString().length - 2);
 
-    const ext = fileItems[1];
+	const s3Url = c.env.S3_CDN_URL;
+	const s3Dir = c.env.S3_CDN_DIR;
 
-    const l = imageId.toString().substring(0,2)
+	const imgUrl = new URL(`https://${s3Url}${s3Dir}${l}/${h}/${imageFile}`);
 
-    const h = imageId.toString().substring(imageId.toString().length - 2)
+	const resized = await fetch(imgUrl, {
+		cf: { image: targetView },
+	});
 
-    const s3Url = c.env.S3_CDN_URL
-    const s3Dir = c.env.S3_CDN_DIR
+	response = new Response(resized.body, resized);
+	response.headers.set('Version', c.env.CF_VERSION_METADATA.id);
+	response.headers.set('Resize-Options', _options);
+	response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`);
 
-    const imgUrl = new URL(`https://${s3Url}${s3Dir}${l}/${h}/${imageFile}`)
+	// await cache.put(c.req.url, response.clone())
 
-    const resized = await fetch(imgUrl, {
-        cf: { image: _view }
-    })
+	return response;
+});
 
-    response = new Response(resized.body, resized);
-    response.headers.set('Version', c.env.CF_VERSION_METADATA.id );
-    response.headers.set('Resize-Options', _options);
-    response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`)
+app.get('/swagger', swaggerUI({ url: '/doc/swagger.json' }));
 
-    // await cache.put(c.req.url, response.clone())
-
-    return response;
-})
-
-app.get("/swagger", swaggerUI({ url: "/doc/swagger.json" }));
-
-export default app
+export default app;
