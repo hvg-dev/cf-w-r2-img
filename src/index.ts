@@ -51,6 +51,7 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
         }
 
         responseViewOptions.fit = 'cover';
+        responseViewOptions.gravity = { x: 0.5, y: 0.5 };
     }
 
     const imageFile = c.req.param('imageFile').toLowerCase() || '';
@@ -113,8 +114,8 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
     response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`);
 
     await cache.put(c.req.url, response.clone())
-    await c.env.IMG_KV.put(cacheKey, JSON.stringify(response.clone().headers))
-    await c.env.IMG_BUCKET.put(s3CacheKey, response.clone().body)
+    await c.env.IMG_KV.put(cacheKey, JSON.stringify(resized.headers))
+    //await c.env.IMG_BUCKET.put(s3CacheKey, response.clone().body)
     return response;
 });
 

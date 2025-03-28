@@ -8,6 +8,8 @@ assets = { directory = "./public", binding = "ASSETS" }
 
 observability= { enabled = true }
 
+placement = { mode = "smart" }
+
 vars = { CF_CACHE_TTL=1000, S3_CDN_URL="r2.hvg.hu", S3_CDN_DIR="/uploads/", S3_CACHE_DIR="cache/" }
 
 kv_namespaces = [
@@ -30,8 +32,8 @@ version_metadata = { binding = "CF_VERSION_METADATA" }
 vars = { CF_CACHE_TTL=1000, S3_CDN_URL="r2.test-hvg.hu", S3_CDN_DIR="/uploads/", S3_CACHE_DIR="cache/" }
 
 kv_namespaces = [
-    { binding = "IMG_KV", id = "678045e22e7e4215999c86774023fb3b",   preview_id = "678045e22e7e4215999c86774023fb3b"}
-#   { binding = "IMG_KV", id = "678045e22e7e4215999c86774023fb3b",   preview_id = "9f6d5f1bc6364a0a84401f4e1b213e34"}
+    { binding = "IMG_KV", id = "386199cd448f428284aa2a4fac2c8037",   preview_id = "9f6d5f1bc6364a0a84401f4e1b213e34"}
+#   { binding = "IMG_KV", id = "386199cd448f428284aa2a4fac2c8037",   preview_id = "9f6d5f1bc6364a0a84401f4e1b213e34"}
 ]
 
 r2_buckets = [
