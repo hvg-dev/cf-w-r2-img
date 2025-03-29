@@ -19,7 +19,7 @@ const addHyphensToGuid = (guid: string) => guid.replace(/(.{8})(.{4})(.{4})(.{4}
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
-    const cache = caches.default
+    const cache = caches.default;
     const CF_CACHE_TTL = c.env.CF_CACHE_TTL;
 
     let viewId = c.req.param('viewId').toLowerCase();
@@ -80,11 +80,11 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
 
     // Check whether the value is already available in the cache
     // if not, fetch it from R2, and store it in the cache
-    let response = await cache.match(c.req.url)
+    let response = await cache.match(c.req.url);
     if (response) {
-        console.log(`Cache HIT for: ${cacheKey}.`)
+        console.log(`Cache HIT for: ${cacheKey}.`);
         console.log(`Current options: ${options}`);
-        return response
+        return response;
     }
 
     console.log(`Cache MISS for: ${cacheKey}.`);
@@ -108,13 +108,23 @@ app.get('/Img/:viewId/:imageFile{.+\\.*}', async (c) => {
         cf: { image: responseViewOptions },
     });
 
-    response = new Response(resized.body, resized);
+    // Ensure the body is read properly using arrayBuffer
+    const resizedBody = await resized.arrayBuffer();
+    if (!resizedBody) {
+        return new Response('Failed to fetch or process the image.', { status: 500 });
+    }
+
+    response = new Response(resizedBody, {
+        status: resized.status,
+        statusText: resized.statusText,
+        headers: resized.headers,
+    });
     response.headers.set('Version', c.env.CF_VERSION_METADATA.id);
     response.headers.set('Resize-Options', options);
     response.headers.set('Cache-Control', `max-age=${CF_CACHE_TTL}`);
 
-    await cache.put(c.req.url, response.clone())
-    await c.env.IMG_KV.put(cacheKey, JSON.stringify(resized.headers))
+    await cache.put(c.req.url, response.clone());
+    //await c.env.IMG_KV.put(cacheKey, JSON.stringify(resized.headers))
     //await c.env.IMG_BUCKET.put(s3CacheKey, response.clone().body)
     return response;
 });
